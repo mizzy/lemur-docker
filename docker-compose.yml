@@ -37,7 +37,7 @@ services:
     depends_on:
       - lemur
     ports:
-      - 87:80
+      - 8787:80
       - 447:443
 
   lemur:
