@@ -9,4 +9,6 @@ RUN apk add --upgrade --no-cache openssl && mkdir -p /etc/nginx/ssl/ && \
 COPY files/lemur-http.conf /etc/nginx/conf.d/lemur-http.conf
 COPY files/lemur-ssl.conf /etc/nginx/conf.d/lemur-ssl.conf
 
+RUN rm /etc/nginx/conf.d/default.conf
+
 CMD ["nginx", "-g", "daemon off;"]
