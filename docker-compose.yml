@@ -38,7 +38,6 @@ services:
       - lemur
     ports:
       - 8787:80
-      - 447:443
 
   lemur:
     image: netlix-lemur:latest
