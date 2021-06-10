@@ -77,12 +77,6 @@ COPY --from=builder /usr/lib/x86_64-linux-gnu/libffi.so.7 /usr/lib/x86_64-linux-
 COPY --from=builder /lib/x86_64-linux-gnu/libcrypt.so.1 /lib/x86_64-linux-gnu/libcrypt.so.1
 
 # postgresql-client
-COPY --from=builder /usr/bin/perl /usr/bin/perl
-COPY --from=builder /usr/share/perl /usr/share/perl
-COPY --from=builder /usr/share/perl5 /usr/share/perl5
-COPY --from=builder /usr/lib/x86_64-linux-gnu/perl-base /usr/lib/x86_64-linux-gnu/perl-base
-COPY --from=builder /usr/lib/x86_64-linux-gnu/perl /usr/lib/x86_64-linux-gnu/perl
-COPY --from=builder /usr/lib/x86_64-linux-gnu/perl-base /usr/lib/x86_64-linux-gnu/perl-base
 COPY --from=builder /usr/bin/psql /usr/bin/psql
 COPY --from=builder /usr/lib/postgresql /usr/lib/postgresql
 COPY --from=builder /usr/bin/ldd /usr/bin/ldd
