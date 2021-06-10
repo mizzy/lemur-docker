@@ -1,6 +1,5 @@
 #############  BUILDER  #############
 FROM ubuntu:20.04 as builder
-LABEL maintainer="Netflix Open Source Development <talent@netflix.com>"
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG VERSION
@@ -13,7 +12,7 @@ WORKDIR /opt/lemur
 RUN apt-get update && \
     apt-get -y --no-install-recommends upgrade && \
     apt-get install -y --no-install-recommends libpq-dev curl build-essential locales libffi-dev libsasl2-dev libldap2-dev \
-        dh-autoreconf git python3-dev python3-pip python3-venv python3-wheel nodejs npm && \
+        dh-autoreconf git python3-dev python3-pip python3-venv python3-wheel nodejs npm supervisor postgresql-client && \
     locale-gen en_US.UTF-8 && export LC_ALL=en_US.UTF-8 && \
     npm config set registry http://registry.npmjs.org/ && \
     npm install npm -g && \
@@ -29,52 +28,85 @@ RUN apt-get update && \
     rm -rf node_modules && \
     python3 -c 'print(" \033[32m BUILDER DONE \033[0m ")'
 
-#############  APP  #############
-FROM ubuntu:20.04
-LABEL maintainer="Netflix Open Source Development <talent@netflix.com>"
-
-ARG DEBIAN_FRONTEND=noninteractive
-ARG VERSION
-
-ARG URLCONTEXT
-
-ENV uid 1337
-ENV gid 1337
-ENV user lemur
-ENV group lemur
-
-# TODO: do not copy build artefacts
-COPY --from=builder /opt/lemur /opt/lemur
-COPY --from=builder /opt/venv /opt/venv
-
-WORKDIR /opt/lemur
-
-RUN addgroup --gid ${gid} ${group} && \
-    adduser --gecos "" --disabled-password --ingroup ${group} --uid ${uid} ${user} && \
-    apt-get update && apt-get -y --no-install-recommends upgrade && \
-    apt-get -y --no-install-recommends install python3 locales haveged supervisor curl postgresql-client openssl && \
-    locale-gen en_US.UTF-8 && export LC_ALL=en_US.UTF-8 && \
-    mkdir -p /opt/lemur /home/lemur/.lemur/ && \
+RUN mkdir -p /opt/lemur /home/lemur/.lemur/ && \
     touch /home/lemur/.lemur/lemur.log && \
-    chown -R $user:$group /opt/lemur/ /home/lemur/.lemur/ && \
-    chmod o+w /home/lemur/.lemur/lemur.log && \
-    apt-get clean autoclean && \
-    apt-get autoremove --yes && \
-    rm -rf /var/lib/{apt,dpkg,cache,log}/ && \
-    python3 -c 'print(" \033[32m APP BUILD DONE \033[0m ")'
+    chmod o+w /home/lemur/.lemur/lemur.log
 
+#############  APP  #############
+FROM gcr.io/distroless/base-debian10
+
+# /bin/bash
+COPY --from=builder /bin/bash /bin/bash
+COPY --from=builder /lib/x86_64-linux-gnu/libtinfo.so.6 /lib/x86_64-linux-gnu/libtinfo.so.6
+
+# python3
+COPY --from=builder /usr/bin/python3 /usr/bin/python3
+COPY --from=builder /lib/x86_64-linux-gnu/libexpat.so.1 /lib/x86_64-linux-gnu/libexpat.so.1
+COPY --from=builder /lib/x86_64-linux-gnu/libz.so.1 /lib/x86_64-linux-gnu/libz.so.1
+COPY --from=builder /lib/x86_64-linux-gnu/libm.so.6 /lib/x86_64-linux-gnu/libm.so.6
+COPY --from=builder /usr/lib/python3.8 /usr/lib/python3.8
+COPY --from=builder /usr/bin/pip /usr/bin/pip
+COPY --from=builder /usr/bin/pip3 /usr/bin/pip3
+COPY --from=builder /usr/lib/python3 /usr/lib/python3
+
+# for python modules
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libldap_r-2.4.so.2 /usr/lib/x86_64-linux-gnu/libldap_r-2.4.so.2
+COPY --from=builder /usr/lib/x86_64-linux-gnu/liblber-2.4.so.2 /usr/lib/x86_64-linux-gnu/liblber-2.4.so.2
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libsasl2.so.2 /usr/lib/x86_64-linux-gnu/libsasl2.so.2
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libgssapi.so.3 /usr/lib/x86_64-linux-gnu/libgssapi.so.3
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libgnutls.so.30 /usr/lib/x86_64-linux-gnu/libgnutls.so.30
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libheimntlm.so.0 /usr/lib/x86_64-linux-gnu/libheimntlm.so.0
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libkrb5.so.26 /usr/lib/x86_64-linux-gnu/libkrb5.so.26
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libasn1.so.8 /usr/lib/x86_64-linux-gnu/libasn1.so.8
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libcom_err.so.2 /usr/lib/x86_64-linux-gnu/libcom_err.so.2
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libhcrypto.so.4 /usr/lib/x86_64-linux-gnu/libhcrypto.so.4
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libroken.so.18 /usr/lib/x86_64-linux-gnu/libroken.so.18
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libp11-kit.so.0 /usr/lib/x86_64-linux-gnu/libp11-kit.so.0
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libidn2.so.0 /usr/lib/x86_64-linux-gnu/libidn2.so.0
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libunistring.so.2 /usr/lib/x86_64-linux-gnu/libunistring.so.2
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libtasn1.so.6 /usr/lib/x86_64-linux-gnu/libtasn1.so.6 
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libnettle.so.7 /usr/lib/x86_64-linux-gnu/libnettle.so.7
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libhogweed.so.5 /usr/lib/x86_64-linux-gnu/libhogweed.so.5
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libgmp.so.10 /usr/lib/x86_64-linux-gnu/libgmp.so.10
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libwind.so.0 /usr/lib/x86_64-linux-gnu/libwind.so.0
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libheimbase.so.1 /usr/lib/x86_64-linux-gnu/libheimbase.so.1
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libhx509.so.5 /usr/lib/x86_64-linux-gnu/libhx509.so.5
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libsqlite3.so.0 /usr/lib/x86_64-linux-gnu/libsqlite3.so.0
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libcrypt.so.1 /usr/lib/x86_64-linux-gnu/libcrypt.so.1
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libffi.so.7 /usr/lib/x86_64-linux-gnu/libffi.so.7
+COPY --from=builder /lib/x86_64-linux-gnu/libcrypt.so.1 /lib/x86_64-linux-gnu/libcrypt.so.1
+
+# postgresql-client
+COPY --from=builder /usr/bin/perl /usr/bin/perl
+COPY --from=builder /usr/share/perl /usr/share/perl
+COPY --from=builder /usr/share/perl5 /usr/share/perl5
+COPY --from=builder /usr/lib/x86_64-linux-gnu/perl-base /usr/lib/x86_64-linux-gnu/perl-base
+COPY --from=builder /usr/lib/x86_64-linux-gnu/perl /usr/lib/x86_64-linux-gnu/perl
+COPY --from=builder /usr/lib/x86_64-linux-gnu/perl-base /usr/lib/x86_64-linux-gnu/perl-base
+COPY --from=builder /usr/bin/psql /usr/bin/psql
+COPY --from=builder /usr/lib/postgresql /usr/lib/postgresql
+COPY --from=builder /usr/bin/ldd /usr/bin/ldd
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libpq.so.5 /usr/lib/x86_64-linux-gnu/libpq.so.5
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libedit.so.2 /usr/lib/x86_64-linux-gnu/libedit.so.2
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libgssapi_krb5.so.2 /usr/lib/x86_64-linux-gnu/libgssapi_krb5.so.2
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libbsd.so.0 /usr/lib/x86_64-linux-gnu/libbsd.so.0
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libkrb5.so.3 /usr/lib/x86_64-linux-gnu/libkrb5.so.3
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libk5crypto.so.3 /usr/lib/x86_64-linux-gnu/libk5crypto.so.3
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libkrb5support.so.0 /usr/lib/x86_64-linux-gnu/libkrb5support.so.0
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libkeyutils.so.1 /usr/lib/x86_64-linux-gnu/libkeyutils.so.1  
+
+# /opt and /home
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder --chown=nonroot:nonroot /opt/lemur /opt/lemur
+COPY --from=builder --chown=nonroot:nonroot /home/lemur /home/lemur
+
+# /entrypoint
 COPY ./files/entrypoint /
-#COPY lemur.conf.py /home/lemur/.lemur/lemur.conf.py
+
+# supervisord
 COPY ./files/supervisor.conf /
-
-RUN chmod +x /entrypoint
-WORKDIR /
-
-HEALTHCHECK --interval=12s --timeout=12s --start-period=30s \
- CMD curl --fail http://localhost:80/api/1/healthcheck | grep -q ok || exit 1
-
-USER root
+COPY --from=builder /usr/bin/supervisord /usr/bin/supervisord
 
 ENTRYPOINT ["/entrypoint"]
 
-CMD ["/usr/bin/supervisord","-c","/supervisor.conf"]
+CMD ["/usr/bin/supervisord", "-c", "/supervisor.conf"]
