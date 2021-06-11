@@ -37,8 +37,7 @@ services:
     depends_on:
       - lemur
     ports:
-      - 87:80
-      - 447:443
+      - 8787:80
 
   lemur:
     image: netlix-lemur:latest
